@@ -4,6 +4,8 @@ from rclpy.node import Node
 import threading
 import datetime
 from std_msgs.msg import String
+from geometry_msgs.msg import PoseWithCovarianceStamped
+from std_srvs.srv import Trigger
 
 from imrc_conpanel.serial_resolver import *
 from imrc_messages.msg import ConpanelLedControl
@@ -27,6 +29,10 @@ BS4 -> 4 beep 1回だけ
 
 
 S,0 -> 0~7が押されたとき
+x 0.0
+y 0.0
+z 1.0
+w 0.0
 """
 
 SERIAL_TIMEOUT = datetime.timedelta(seconds=2.0)
@@ -49,6 +55,7 @@ class ControlPanel(Node):
         self.bz_sub = self.create_subscription(ConpanelBuzzerControl,'conpanel_bz', self.bz_sub_callback, 10)
         
         self.conpanel_miss_ball_pub = self.create_publisher(String, 'conpanel_miss_ball', 10)
+        self.initial_pose_pub = self.create_publisher(PoseWithCovarianceStamped, "/initialpose", 10)
 
         self.start()
         self.timer_loop = self.create_timer(0.2, self.loop)
@@ -173,6 +180,10 @@ class ControlPanel(Node):
             str.data = "NG"
             self.conpanel_miss_ball_pub.publish(str)
 
+        elif(buttonNumber == 4):
+            self.initialize_imu()
+            self.publish_initialpose()
+
     def processExternalButtonCommand(self, buttonNumber):
         if(self.button_external_states_pre[buttonNumber] == 0 and self.button_external_states[buttonNumber] == 1):
             self.logger.info("External Button {0} has pressed".format(buttonNumber))
@@ -183,6 +194,27 @@ class ControlPanel(Node):
 
     def __del__(self):
         self.uart_utils.port_close()
+
+    def initialize_imu(self):
+        # ros2 service call /reset_posture std_srvs/srv/Trigger {}
+        self.imu_cli = self.create_client(Trigger, "reset_posture")
+        self.imu_req = Trigger.Request()
+        self.future = self.imu_cli.call_async(self.imu_req)
+        rclpy.spin_until_future_complete(self, self.future)
+        return
+
+    
+    def publish_initialpose(self):
+        initial_pose = PoseWithCovarianceStamped()
+        initial_pose.header.stamp = self.get_clock().now().to_msg()
+        initial_pose.header.frame_id = "map"
+        initial_pose.pose.pose.position.x = 0.0
+        initial_pose.pose.pose.position.y = 0.0
+        initial_pose.pose.pose.orientation.z = 1.0
+        initial_pose.pose.pose.orientation.w = 0.0
+
+        self.initial_pose_pub.publish(initial_pose)
+
     
     def parseReceived(self):
         global gSerialReceive
