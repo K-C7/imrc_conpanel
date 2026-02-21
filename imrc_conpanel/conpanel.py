@@ -6,6 +6,7 @@ import datetime
 from std_msgs.msg import String
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from std_srvs.srv import Trigger
+from nav2_msgs.srv import ClearEntireCostmap
 
 from imrc_conpanel.serial_resolver import *
 from imrc_messages.msg import ConpanelLedControl
@@ -183,6 +184,9 @@ class ControlPanel(Node):
         elif(buttonNumber == 4):
             self.initialize_imu()
             self.publish_initialpose()
+        
+        elif(buttonNumber == 5):
+            self.reset_costmap()
 
     def processExternalButtonCommand(self, buttonNumber):
         if(self.button_external_states_pre[buttonNumber] == 0 and self.button_external_states[buttonNumber] == 1):
@@ -194,6 +198,17 @@ class ControlPanel(Node):
 
     def __del__(self):
         self.uart_utils.port_close()
+    
+    def reset_costmap(self):
+        g_cli = self.create_client(ClearEntireCostmap, "/global_costmap/clear_entirely_global_costmap")
+        l_cli = self.create_client(ClearEntireCostmap, "/local_costmap/clear_entirely_local_costmap")
+        while not g_cli.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('service not available, waiting again...')
+        while not l_cli.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('service not available, waiting again...')
+        req = ClearEntireCostmap.Request()
+        g_future = g_cli.call(req)
+        l_future = l_cli.call(req)
 
     def initialize_imu(self):
         # ros2 service call /reset_posture std_srvs/srv/Trigger {}
