@@ -203,9 +203,9 @@ class ControlPanel(Node):
         g_cli = self.create_client(ClearEntireCostmap, "/global_costmap/clear_entirely_global_costmap")
         l_cli = self.create_client(ClearEntireCostmap, "/local_costmap/clear_entirely_local_costmap")
         while not g_cli.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('service not available, waiting again...')
+            self.get_logger().info('Global cost map reset service not available, waiting again...')
         while not l_cli.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('service not available, waiting again...')
+            self.get_logger().info('Global cost map reset service not available, waiting again...')
         req = ClearEntireCostmap.Request()
         g_future = g_cli.call(req)
         l_future = l_cli.call(req)
@@ -213,8 +213,12 @@ class ControlPanel(Node):
     def initialize_imu(self):
         # ros2 service call /reset_posture std_srvs/srv/Trigger {}
         self.imu_cli = self.create_client(Trigger, "reset_posture")
+
+        while not self.imu_cli.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('imu reset service not available, waiting again...')
+        
         self.imu_req = Trigger.Request()
-        self.future = self.imu_cli.call_async(self.imu_req)
+        self.future = self.imu_cli.call(self.imu_req)
         rclpy.spin_until_future_complete(self, self.future)
         return
 
