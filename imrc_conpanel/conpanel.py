@@ -11,6 +11,7 @@ from nav2_msgs.srv import ClearEntireCostmap
 from imrc_conpanel.serial_resolver import *
 from imrc_messages.msg import ConpanelLedControl
 from imrc_messages.msg import ConpanelBuzzerControl
+from imrc_messages.msg import GeneralCommand
 
 gSerialReceive = ""
 ggetRes = ""
@@ -52,11 +53,12 @@ class ControlPanel(Node):
         self.logger = self.get_logger()
         self.uart_utils.get_logger(self.logger)
 
-        self.led_sub = self.create_subscription(ConpanelLedControl,'conpanel_led', self.led_sub_callback, 10)
-        self.bz_sub = self.create_subscription(ConpanelBuzzerControl,'conpanel_bz', self.bz_sub_callback, 10)
+        self.led_sub = self.create_subscription(ConpanelLedControl,'/conpanel_led', self.led_sub_callback, 10)
+        self.bz_sub = self.create_subscription(ConpanelBuzzerControl,'/conpanel_bz', self.bz_sub_callback, 10)
         
-        self.conpanel_miss_ball_pub = self.create_publisher(String, 'conpanel_miss_ball', 10)
+        self.conpanel_miss_ball_pub = self.create_publisher(String, '/conpanel_miss_ball', 10)
         self.initial_pose_pub = self.create_publisher(PoseWithCovarianceStamped, "/initialpose", 10)
+        self.robot_command_pub = self.create_publisher(GeneralCommand, "/robot_command", 10)
 
         self.start()
         self.timer_loop = self.create_timer(0.2, self.loop)
@@ -191,10 +193,13 @@ class ControlPanel(Node):
     def processExternalButtonCommand(self, buttonNumber):
         if(self.button_external_states_pre[buttonNumber] == 0 and self.button_external_states[buttonNumber] == 1):
             self.logger.info("External Button {0} has pressed".format(buttonNumber))
-            pass
+            if(buttonNumber == 1):
+                gc = GeneralCommand()
+                gc.target = "calibration"
+                gc.param = 0
+                self.robot_command_pub.publish(gc)
         else:
             self.logger.info("External Button {0} has released".format(buttonNumber))
-            pass
 
     def __del__(self):
         self.uart_utils.port_close()
@@ -205,7 +210,7 @@ class ControlPanel(Node):
         while not g_cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('Global cost map reset service not available, waiting again...')
         while not l_cli.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('Global cost map reset service not available, waiting again...')
+            self.get_logger().info('Local cost map reset service not available, waiting again...')
         req = ClearEntireCostmap.Request()
         g_future = g_cli.call(req)
         l_future = l_cli.call(req)
@@ -215,7 +220,7 @@ class ControlPanel(Node):
         self.imu_cli = self.create_client(Trigger, "reset_posture")
 
         while not self.imu_cli.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('imu reset service not available, waiting again...')
+            self.get_logger().info('IMU reset service not available, waiting again...')
         
         self.imu_req = Trigger.Request()
         self.future = self.imu_cli.call(self.imu_req)
