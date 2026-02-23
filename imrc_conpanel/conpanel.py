@@ -6,6 +6,7 @@ import datetime
 from std_msgs.msg import String
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from std_srvs.srv import Trigger
+from std_srvs.srv import Empty
 from nav2_msgs.srv import ClearEntireCostmap
 
 from imrc_conpanel.serial_resolver import *
@@ -185,10 +186,18 @@ class ControlPanel(Node):
 
         elif(buttonNumber == 4):
             self.initialize_imu()
-            self.publish_initialpose()
+            # self.publish_initialpose()
         
         elif(buttonNumber == 5):
             self.reset_costmap()
+        
+        elif(buttonNumber == 6):
+            cli = self.create_client(Empty, "/conpanel_reset_miss_ball", 10)
+            while not cli.wait_for_service(timeout_sec=1.0):
+                self.get_logger().info('/conpanel_reset_miss_ball service not available, waiting again...')
+            req = Empty()
+            cli.call(req)
+                
 
     def processExternalButtonCommand(self, buttonNumber):
         if(self.button_external_states_pre[buttonNumber] == 0 and self.button_external_states[buttonNumber] == 1):
@@ -222,10 +231,9 @@ class ControlPanel(Node):
         while not self.imu_cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('IMU reset service not available, waiting again...')
         
-        self.imu_req = Trigger.Request()
-        self.future = self.imu_cli.call(self.imu_req)
-        rclpy.spin_until_future_complete(self, self.future)
-        return
+        imu_req = Trigger.Request()
+        future = self.imu_cli.call_async(self.imu_req)
+        future.add_done_callback(self.reset_costmap)
 
     
     def publish_initialpose(self):
