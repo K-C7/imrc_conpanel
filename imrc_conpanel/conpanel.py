@@ -56,8 +56,15 @@ class ControlPanel(Node):
         self.logger = self.get_logger()
         self.uart_utils.get_logger(self.logger)
 
-        self.led_sub = self.create_subscription(ConpanelLedControl,'/conpanel_led', self.led_sub_callback, 10)
-        self.bz_sub = self.create_subscription(ConpanelBuzzerControl,'/conpanel_bz', self.bz_sub_callback, 10)
+        self.led_sub = self.create_subscription(ConpanelLedControl, '/conpanel_led', self.led_sub_callback, 10)
+        self.bz_sub = self.create_subscription(ConpanelBuzzerControl, '/conpanel_bz', self.bz_sub_callback, 10)
+        
+        # "FORWARD"ですすめる
+        # "KEEP"でそのままキープ
+        # "BACKWARD"で戻る
+        self.index_skip_mode = 0
+        self.index_skip_mode_pub = self.create_publisher(String, '/index_skip_mode', 10)
+        self.timer_index_skip_mode = self.create_timer(0.2, self.index_skip_handler)
         
         self.conpanel_miss_ball_pub = self.create_publisher(String, '/conpanel_miss_ball', 10)
         self.initial_pose_pub = self.create_publisher(PoseWithCovarianceStamped, "/initialpose", 10)
@@ -110,9 +117,9 @@ class ControlPanel(Node):
         mode_ready_str.data = self.mode_ready
         self.mode_ready_pub.publish(mode_ready_str)
         
+    def index_skip_handler(self):
+        pass
 
-        
-    
     def led_sub_callback(self, msg):
         sendBuffer = "L"
         sendBuffer += str(msg.led_index)
@@ -211,6 +218,14 @@ class ControlPanel(Node):
                 self.robot_command_pub.publish(gc)
         else:
             self.logger.info("External Button {0} has released".format(buttonNumber))
+        
+        if(buttonNumber == 2 or buttonNumber == 3):
+            if(self.button_external_states[2]):
+                index_skip_mode_pub
+            elif(self.button_external_states[3]):
+                pass
+            else:
+                pass
 
     def __del__(self):
         self.uart_utils.port_close()
