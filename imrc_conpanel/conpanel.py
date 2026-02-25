@@ -232,7 +232,7 @@ class ControlPanel(Node):
             self.get_logger().info('IMU reset service not available, waiting again...')
         
         imu_req = Trigger.Request()
-        future = self.imu_cli.call_async(self.imu_req)
+        future = self.imu_cli.call_async(imu_req)
         future.add_done_callback(self.reset_costmap)
 
     
