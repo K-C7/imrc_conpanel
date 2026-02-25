@@ -9,6 +9,8 @@ from std_srvs.srv import Trigger
 from std_srvs.srv import Empty
 from nav2_msgs.srv import ClearEntireCostmap
 
+import time
+
 from imrc_conpanel.serial_resolver import *
 from imrc_messages.msg import ConpanelLedControl
 from imrc_messages.msg import ConpanelBuzzerControl
@@ -264,6 +266,8 @@ class ControlPanel(Node):
                 pass
 
                 gSerialReceive = ''
+            
+            time.sleep(0.001)
 
 
 class UartUtils():
@@ -301,6 +305,8 @@ class UartUtils():
                 data = data.strip()
                 data = data.decode('utf-8')
                 gSerialReceive = data
+            
+            time.sleep(0.001)
 
     
     def port_close(self):
