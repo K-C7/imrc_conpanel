@@ -221,7 +221,8 @@ class ControlPanel(Node):
         
         if(buttonNumber == 2 or buttonNumber == 3):
             if(self.button_external_states[2]):
-                index_skip_mode_pub
+                # index_skip_mode_pub
+                pass
             elif(self.button_external_states[3]):
                 pass
             else:
@@ -231,6 +232,7 @@ class ControlPanel(Node):
         self.uart_utils.port_close()
     
     def reset_costmap(self):
+        self.get_logger().warn("Resetting costmap triggered.")
         g_cli = self.create_client(ClearEntireCostmap, "/global_costmap/clear_entirely_global_costmap")
         l_cli = self.create_client(ClearEntireCostmap, "/local_costmap/clear_entirely_local_costmap")
         while not g_cli.wait_for_service(timeout_sec=1.0):
@@ -242,6 +244,7 @@ class ControlPanel(Node):
         l_future = l_cli.call(req)
 
     def initialize_imu(self):
+        self.get_logger().warn("Initializing IMU triggered.")
         # ros2 service call /reset_posture std_srvs/srv/Trigger {}
         self.imu_cli = self.create_client(Trigger, "reset_posture")
 
@@ -250,10 +253,11 @@ class ControlPanel(Node):
         
         imu_req = Trigger.Request()
         future = self.imu_cli.call_async(imu_req)
-        future.add_done_callback(self.reset_costmap)
+        future.add_done_callback(self.publish_initialpose)
 
     
-    def publish_initialpose(self):
+    def publish_initialpose(self, _):
+        self.get_logger().warn("Publishing initialpose now.")
         initial_pose = PoseWithCovarianceStamped()
         initial_pose.header.stamp = self.get_clock().now().to_msg()
         initial_pose.header.frame_id = "map"
