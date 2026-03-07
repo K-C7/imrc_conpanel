@@ -9,6 +9,8 @@ from std_srvs.srv import Trigger
 from std_srvs.srv import Empty
 from nav2_msgs.srv import ClearEntireCostmap
 
+import time
+
 from imrc_conpanel.serial_resolver import *
 from imrc_messages.msg import ConpanelLedControl
 from imrc_messages.msg import ConpanelBuzzerControl
@@ -54,8 +56,15 @@ class ControlPanel(Node):
         self.logger = self.get_logger()
         self.uart_utils.get_logger(self.logger)
 
-        self.led_sub = self.create_subscription(ConpanelLedControl,'/conpanel_led', self.led_sub_callback, 10)
-        self.bz_sub = self.create_subscription(ConpanelBuzzerControl,'/conpanel_bz', self.bz_sub_callback, 10)
+        self.led_sub = self.create_subscription(ConpanelLedControl, '/conpanel_led', self.led_sub_callback, 10)
+        self.bz_sub = self.create_subscription(ConpanelBuzzerControl, '/conpanel_bz', self.bz_sub_callback, 10)
+        
+        # "FORWARD"ですすめる
+        # "KEEP"でそのままキープ
+        # "BACKWARD"で戻る
+        self.index_skip_mode = 0
+        self.index_skip_mode_pub = self.create_publisher(String, '/index_skip_mode', 10)
+        self.timer_index_skip_mode = self.create_timer(0.2, self.index_skip_handler)
         
         self.conpanel_miss_ball_pub = self.create_publisher(String, '/conpanel_miss_ball', 10)
         self.initial_pose_pub = self.create_publisher(PoseWithCovarianceStamped, "/initialpose", 10)
@@ -108,9 +117,9 @@ class ControlPanel(Node):
         mode_ready_str.data = self.mode_ready
         self.mode_ready_pub.publish(mode_ready_str)
         
+    def index_skip_handler(self):
+        pass
 
-        
-    
     def led_sub_callback(self, msg):
         sendBuffer = "L"
         sendBuffer += str(msg.led_index)
@@ -213,11 +222,21 @@ class ControlPanel(Node):
             #     self.robot_command_pub.publish(gc)
         else:
             self.logger.info("External Button {0} has released".format(buttonNumber))
+        
+        if(buttonNumber == 2 or buttonNumber == 3):
+            if(self.button_external_states[2]):
+                # index_skip_mode_pub
+                pass
+            elif(self.button_external_states[3]):
+                pass
+            else:
+                pass
 
     def __del__(self):
         self.uart_utils.port_close()
     
     def reset_costmap(self):
+        self.get_logger().warn("Resetting costmap triggered.")
         g_cli = self.create_client(ClearEntireCostmap, "/global_costmap/clear_entirely_global_costmap")
         l_cli = self.create_client(ClearEntireCostmap, "/local_costmap/clear_entirely_local_costmap")
         while not g_cli.wait_for_service(timeout_sec=1.0):
@@ -229,6 +248,7 @@ class ControlPanel(Node):
         l_future = l_cli.call(req)
 
     def initialize_imu(self):
+        self.get_logger().warn("Initializing IMU triggered.")
         # ros2 service call /reset_posture std_srvs/srv/Trigger {}
         self.imu_cli = self.create_client(Trigger, "reset_posture")
 
@@ -236,11 +256,12 @@ class ControlPanel(Node):
             self.get_logger().info('IMU reset service not available, waiting again...')
         
         imu_req = Trigger.Request()
-        future = self.imu_cli.call_async(self.imu_req)
-        future.add_done_callback(self.reset_costmap)
+        future = self.imu_cli.call_async(imu_req)
+        future.add_done_callback(self.publish_initialpose)
 
     
-    def publish_initialpose(self):
+    def publish_initialpose(self, _):
+        self.get_logger().warn("Publishing initialpose now.")
         initial_pose = PoseWithCovarianceStamped()
         initial_pose.header.stamp = self.get_clock().now().to_msg()
         initial_pose.header.frame_id = "map"
@@ -268,6 +289,8 @@ class ControlPanel(Node):
                 pass
 
                 gSerialReceive = ''
+            
+            time.sleep(0.001)
 
 
 class UartUtils():
@@ -305,6 +328,8 @@ class UartUtils():
                 data = data.strip()
                 data = data.decode('utf-8')
                 gSerialReceive = data
+            
+            time.sleep(0.001)
 
     
     def port_close(self):
