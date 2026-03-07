@@ -199,9 +199,15 @@ class ControlPanel(Node):
             str.data = "OK"
             self.conpanel_miss_ball_pub.publish(str)
         elif(buttonNumber == 7):
-            str = String()
-            str.data = "NG"
-            self.conpanel_miss_ball_pub.publish(str)
+            # str = String()
+            # str.data = "NG"
+            # self.conpanel_miss_ball_pub.publish(str)
+
+            cli = self.create_client(Empty, "/conpanel_reset_miss_ball", 10)
+            while not cli.wait_for_service(timeout_sec=1.0):
+                self.get_logger().info('/conpanel_reset_miss_ball service not available, waiting again...')
+            req = Empty()
+            cli.call(req)
 
         elif(buttonNumber == 4):
             self.initialize_imu()
@@ -211,21 +217,19 @@ class ControlPanel(Node):
             self.reset_costmap()
         
         elif(buttonNumber == 6):
-            cli = self.create_client(Empty, "/conpanel_reset_miss_ball", 10)
-            while not cli.wait_for_service(timeout_sec=1.0):
-                self.get_logger().info('/conpanel_reset_miss_ball service not available, waiting again...')
-            req = Empty()
-            cli.call(req)
-                
+            gc = GeneralCommand()
+            gc.target = "calibration"
+            gc.param = 0
+            self.robot_command_pub.publish(gc)
 
     def processExternalButtonCommand(self, buttonNumber):
         if(self.button_external_states_pre[buttonNumber] == 0 and self.button_external_states[buttonNumber] == 1):
             self.logger.info("External Button {0} has pressed".format(buttonNumber))
-            if(buttonNumber == 1):
-                gc = GeneralCommand()
-                gc.target = "calibration"
-                gc.param = 0
-                self.robot_command_pub.publish(gc)
+            # if(buttonNumber == 1):
+            #     gc = GeneralCommand()
+            #     gc.target = "calibration"
+            #     gc.param = 0
+            #     self.robot_command_pub.publish(gc)
         else:
             self.logger.info("External Button {0} has released".format(buttonNumber))
         
