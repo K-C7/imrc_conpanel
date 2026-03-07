@@ -62,9 +62,9 @@ class ControlPanel(Node):
         # "FORWARD"ですすめる
         # "KEEP"でそのままキープ
         # "BACKWARD"で戻る
-        self.index_skip_mode = 0
+        self.index_skip_mode = "KEEP"
         self.index_skip_mode_pub = self.create_publisher(String, '/index_skip_mode', 10)
-        self.timer_index_skip_mode = self.create_timer(0.2, self.index_skip_handler)
+        self.timer_index_skip_mode = self.create_timer(0.5, self.index_skip_handler)
         
         self.conpanel_miss_ball_pub = self.create_publisher(String, '/conpanel_miss_ball', 10)
         self.initial_pose_pub = self.create_publisher(PoseWithCovarianceStamped, "/initialpose", 10)
@@ -118,7 +118,17 @@ class ControlPanel(Node):
         self.mode_ready_pub.publish(mode_ready_str)
         
     def index_skip_handler(self):
-        pass
+        if(self.button_external_states[2]):
+            # index_skip_mode_pub
+            self.index_skip_mode = "FORWARD"
+        elif(self.button_external_states[3]):
+            self.index_skip_mode = "BACKWARD"
+        else:
+            self.index_skip_mode = "KEEP"
+        
+        msg = String()
+        msg.data = self.index_skip_mode
+        self.index_skip_mode_pub.publish(msg)
 
     def led_sub_callback(self, msg):
         sendBuffer = "L"
@@ -220,13 +230,7 @@ class ControlPanel(Node):
             self.logger.info("External Button {0} has released".format(buttonNumber))
         
         if(buttonNumber == 2 or buttonNumber == 3):
-            if(self.button_external_states[2]):
-                # index_skip_mode_pub
-                pass
-            elif(self.button_external_states[3]):
-                pass
-            else:
-                pass
+            pass
 
     def __del__(self):
         self.uart_utils.port_close()
