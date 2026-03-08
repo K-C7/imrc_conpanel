@@ -15,6 +15,7 @@ from imrc_conpanel.serial_resolver import *
 from imrc_messages.msg import ConpanelLedControl
 from imrc_messages.msg import ConpanelBuzzerControl
 from imrc_messages.msg import GeneralCommand
+from imrc_messages.srv import ResetMissBall
 
 gSerialReceive = ""
 ggetRes = ""
@@ -104,7 +105,7 @@ class ControlPanel(Node):
         else:
             self.mode_operation = "AUTO"
         
-        if(self.button_external_states[1] == 0):
+        if(self.button_external_states[1] == 1):
             self.mode_ready = "STAND BY"
         else:
             self.mode_ready = "GO"
@@ -118,10 +119,10 @@ class ControlPanel(Node):
         self.mode_ready_pub.publish(mode_ready_str)
         
     def index_skip_handler(self):
-        if(self.button_external_states[2]):
+        if not (self.button_external_states[2]):
             # index_skip_mode_pub
             self.index_skip_mode = "FORWARD"
-        elif(self.button_external_states[3]):
+        elif not (self.button_external_states[3]):
             self.index_skip_mode = "BACKWARD"
         else:
             self.index_skip_mode = "KEEP"
@@ -203,11 +204,8 @@ class ControlPanel(Node):
             # str.data = "NG"
             # self.conpanel_miss_ball_pub.publish(str)
 
-            cli = self.create_client(Empty, "/conpanel_reset_miss_ball", 10)
-            while not cli.wait_for_service(timeout_sec=1.0):
-                self.get_logger().info('/conpanel_reset_miss_ball service not available, waiting again...')
-            req = Empty()
-            cli.call(req)
+            self.miss_reset_cli = self.create_client(ResetMissBall, "/reset_miss_ball")
+            self.miss_reset_callback()
 
         elif(buttonNumber == 4):
             self.initialize_imu()
@@ -295,6 +293,21 @@ class ControlPanel(Node):
                 gSerialReceive = ''
             
             time.sleep(0.001)
+
+    def miss_reset_callback(self):
+        while not self.miss_reset_cli.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('Waiting for miss reset service...')
+        req = ResetMissBall.Request()
+        req.color = "ALL"
+        future = self.miss_reset_cli.call_async(req)
+        future.add_done_callback(self.miss_reset_done)
+        
+    def miss_reset_done(self, future):
+        try:
+            result = future.result()
+            self.get_logger().info("ミスボールリセット成功")
+        except Exception as e:
+            self.get_logger().error(f"ミスボールリセット失敗: {e}")
 
 
 class UartUtils():
