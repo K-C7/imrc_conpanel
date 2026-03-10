@@ -44,7 +44,7 @@ SERIAL_TIMEOUT = datetime.timedelta(seconds=2.0)
 
 class ControlPanel(Node):
     def __init__(self):
-        super().__init__('uart_bridge')
+        super().__init__('conpanel')
 
         # self.declare_parameter('port', '/dev/ttyACM0')
         # self.port_path = self.get_parameter('port').get_parameter_value().string_value
