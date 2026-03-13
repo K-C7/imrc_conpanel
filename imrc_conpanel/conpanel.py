@@ -45,7 +45,7 @@ SERIAL_TIMEOUT = datetime.timedelta(seconds=2.0)
 
 class ControlPanel(Node):
     def __init__(self):
-        super().__init__('uart_bridge')
+        super().__init__('conpanel')
 
         # self.declare_parameter('port', '/dev/ttyACM0')
         # self.port_path = self.get_parameter('port').get_parameter_value().string_value
@@ -119,10 +119,10 @@ class ControlPanel(Node):
         self.mode_ready_pub.publish(mode_ready_str)
         
     def index_skip_handler(self):
-        if not (self.button_external_states[2]):
+        if(self.button_external_states[2] and not self.button_external_states[3]):
             # index_skip_mode_pub
             self.index_skip_mode = "FORWARD"
-        elif not (self.button_external_states[3]):
+        elif(not self.button_external_states[2] and self.button_external_states[3]):
             self.index_skip_mode = "BACKWARD"
         else:
             self.index_skip_mode = "KEEP"
