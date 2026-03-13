@@ -9,7 +9,7 @@ from std_srvs.srv import Trigger
 from std_srvs.srv import Empty
 from nav2_msgs.srv import ClearEntireCostmap
 
-import time
+import time, math
 
 from imrc_conpanel.serial_resolver import *
 from imrc_messages.msg import ConpanelLedControl
@@ -269,8 +269,8 @@ class ControlPanel(Node):
         initial_pose.header.frame_id = "map"
         initial_pose.pose.pose.position.x = 0.0
         initial_pose.pose.pose.position.y = 0.0
-        initial_pose.pose.pose.orientation.z = 1.0
-        initial_pose.pose.pose.orientation.w = 0.0
+        initial_pose.pose.pose.orientation.z = math.sin(-1.5708 / 2.0)
+        initial_pose.pose.pose.orientation.w = math.cos(-1.5708 / 2.0)
 
         self.initial_pose_pub.publish(initial_pose)
 
