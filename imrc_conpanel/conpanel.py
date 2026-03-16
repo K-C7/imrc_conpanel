@@ -56,7 +56,7 @@ class ControlPanel(Node):
         self.uart_utils.get_logger(self.logger)
         
         self.uart_utils.port_open()
-        self.get_logger().info(f'接続開始ポート: {self.port_path}')
+        self.get_logger().info(f'接続開始')
         thread_serialRead = threading.Thread(target=self.uart_utils.receiveLine_daemon, daemon=True)
         thread_parseReceived = threading.Thread(target=self.parseReceived, daemon=True)
         thread_serialRead.start()
@@ -343,7 +343,7 @@ class UartUtils():
             except (serial.SerialException, OSError) as e:
                 if self.logger:
                     self.logger.error(f"Serial port not found or busy, retrying in 1 seconds... ({e})")
-                time.sleep(1) # 再試行までの待機時間
+                time.sleep(0.1) # 再試行までの待機時間
     
     def send(self, data):
         """送信時にエラーが発生しても、ここでは例外を投げるだけでdaemon側に任せるか、保護する"""
@@ -380,7 +380,7 @@ class UartUtils():
                 if self.ser:
                     self.ser.close()
                 self.ser = None
-                time.sleep(0.5)
+                time.sleep(1)
 
             time.sleep(0.001)
 
