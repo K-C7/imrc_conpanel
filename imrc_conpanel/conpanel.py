@@ -121,9 +121,9 @@ class ControlPanel(Node):
     def index_skip_handler(self):
         if(self.button_external_states[2] and not self.button_external_states[3]):
             # index_skip_mode_pub
-            self.index_skip_mode = "FORWARD"
-        elif(not self.button_external_states[2] and self.button_external_states[3]):
             self.index_skip_mode = "BACKWARD"
+        elif(not self.button_external_states[2] and self.button_external_states[3]):
+            self.index_skip_mode = "FORWARD"
         else:
             self.index_skip_mode = "KEEP"
         
