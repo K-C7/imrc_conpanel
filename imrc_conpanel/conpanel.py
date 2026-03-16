@@ -215,10 +215,11 @@ class ControlPanel(Node):
             self.reset_costmap()
         
         elif(buttonNumber == 6):
-            gc = GeneralCommand()
-            gc.target = "calibration"
-            gc.param = 0
-            self.robot_command_pub.publish(gc)
+            # gc = GeneralCommand()
+            # gc.target = "calibration"
+            # gc.param = 0
+            # self.robot_command_pub.publish(gc)
+            self.initialize_imu_reverse()
 
     def processExternalButtonCommand(self, buttonNumber):
         if(self.button_external_states_pre[buttonNumber] == 0 and self.button_external_states[buttonNumber] == 1):
@@ -260,6 +261,18 @@ class ControlPanel(Node):
         imu_req = Trigger.Request()
         future = self.imu_cli.call_async(imu_req)
         future.add_done_callback(self.publish_initialpose)
+    
+    def initialize_imu_reverse(self):
+        self.get_logger().warn("Initializing IMU triggered.")
+        # ros2 service call /reset_posture std_srvs/srv/Trigger {}
+        self.imu_cli = self.create_client(Trigger, "reset_posture")
+
+        while not self.imu_cli.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('IMU reset service not available, waiting again...')
+        
+        imu_req = Trigger.Request()
+        future = self.imu_cli.call_async(imu_req)
+        future.add_done_callback(self.publish_initialpose_reverse)
 
     
     def publish_initialpose(self, _):
@@ -271,6 +284,18 @@ class ControlPanel(Node):
         initial_pose.pose.pose.position.y = 0.0
         initial_pose.pose.pose.orientation.z = math.sin(-1.5708 / 2.0)
         initial_pose.pose.pose.orientation.w = math.cos(-1.5708 / 2.0)
+
+        self.initial_pose_pub.publish(initial_pose)
+    
+    def publish_initialpose_reverse(self, _):
+        self.get_logger().warn("Publishing initialpose now.")
+        initial_pose = PoseWithCovarianceStamped()
+        initial_pose.header.stamp = self.get_clock().now().to_msg()
+        initial_pose.header.frame_id = "map"
+        initial_pose.pose.pose.position.x = 0.0
+        initial_pose.pose.pose.position.y = 0.0
+        initial_pose.pose.pose.orientation.z = math.sin(1.5708 / 2.0)
+        initial_pose.pose.pose.orientation.w = math.cos(1.5708 / 2.0)
 
         self.initial_pose_pub.publish(initial_pose)
 
