@@ -49,12 +49,17 @@ class ControlPanel(Node):
         # self.declare_parameter('port', '/dev/ttyACM0')
         # self.port_path = self.get_parameter('port').get_parameter_value().string_value
         conpanel_pi_sn = "92ABB4951A04E814"
-        self.port_path = get_tty_by_serial(conpanel_pi_sn)
-        self.get_logger().info(f'接続開始ポート: {self.port_path}')
-
-        self.uart_utils = UartUtils(self.port_path)
+        # self.port_path = get_tty_by_serial(conpanel_pi_sn)
+        self.uart_utils = UartUtils(conpanel_pi_sn)
         self.logger = self.get_logger()
         self.uart_utils.get_logger(self.logger)
+        
+        self.uart_utils.port_open()
+        self.get_logger().info(f'接続開始ポート: {self.port_path}')
+        thread_serialRead = threading.Thread(target=self.uart_utils.receiveLine_daemon, daemon=True)
+        thread_parseReceived = threading.Thread(target=self.parseReceived, daemon=True)
+        thread_serialRead.start()
+        thread_parseReceived.start()
 
         self.led_sub = self.create_subscription(ConpanelLedControl, '/conpanel_led', self.led_sub_callback, 10)
         self.bz_sub = self.create_subscription(ConpanelBuzzerControl, '/conpanel_bz', self.bz_sub_callback, 10)
@@ -73,11 +78,6 @@ class ControlPanel(Node):
         self.start()
         self.timer_loop = self.create_timer(0.2, self.loop)
         
-        self.uart_utils.port_open()
-        thread_serialRead = threading.Thread(target=self.uart_utils.receiveLine_daemon, daemon=True)
-        thread_parseReceived = threading.Thread(target=self.parseReceived, daemon=True)
-        thread_serialRead.start()
-        thread_parseReceived.start()
 
         self.update_duration = 0.5
         self.button_updater = self.create_timer(self.update_duration, self.button_update)
@@ -120,9 +120,9 @@ class ControlPanel(Node):
     def index_skip_handler(self):
         if(self.button_external_states[2] and not self.button_external_states[3]):
             # index_skip_mode_pub
-            self.index_skip_mode = "FORWARD"
-        elif(not self.button_external_states[2] and self.button_external_states[3]):
             self.index_skip_mode = "BACKWARD"
+        elif(not self.button_external_states[2] and self.button_external_states[3]):
+            self.index_skip_mode = "FORWARD"
         else:
             self.index_skip_mode = "KEEP"
         
@@ -296,52 +296,86 @@ class ControlPanel(Node):
             
             time.sleep(0.001)
 
-
 class UartUtils():
-    def __init__(self, port):
-        self.uart_port_num = port
-        # self.uart_port_num = "/dev/ttyUSB0"
+    def __init__(self, sn):
+        self.sn = sn
+        self.uart_port_num = None
         self.uart_baud_rate = 115200
         self.logger = None
+        self.ser = None  # 初期値はNone
 
     def get_logger(self, logger):
         self.logger = logger
     
     def port_open(self):
+        """接続ができるまで無限ループで試行する"""
+        if self.ser is not None and self.ser.is_open:
+            self.ser.close()
+
         while True:
             try:
-                self.ser = serial.Serial(self.uart_port_num, self.uart_baud_rate, timeout=1)
-                self.ser.readline()
+                if self.logger:
+                    self.logger.info(f"Attempting to connect to {self.uart_port_num}...")
                 
-                break
+                self.uart_port_num = get_tty_by_serial(self.sn)
+                self.ser = serial.Serial(self.uart_port_num, self.uart_baud_rate, timeout=1)
+                # 接続直後のゴミデータを飛ばす
+                self.ser.reset_input_buffer()
+                
+                if self.logger:
+                    self.logger.info("Serial port connected!")
+                break # 接続成功
             
-            except serial.serialutil.SerialException:
-                self.logger.error("Serial port not found, retrying...")
-        
-        self.logger.info("Seial port connected!")
+            except (serial.SerialException, OSError) as e:
+                if self.logger:
+                    self.logger.error(f"Serial port not found or busy, retrying in 1 seconds... ({e})")
+                time.sleep(1) # 再試行までの待機時間
     
     def send(self, data):
-        self.ser.write(data.encode('utf-8'))
+        """送信時にエラーが発生しても、ここでは例外を投げるだけでdaemon側に任せるか、保護する"""
+        if self.ser and self.ser.is_open:
+            try:
+                self.ser.write(data.encode('utf-8'))
+            except Exception as e:
+                if self.logger:
+                    self.logger.error(f"Send failed: {e}")
     
     def receiveLine_daemon(self):
         global gSerialReceive
-        while(1):
-            if self.ser !='':
-                # data = self.ser.read(1)
+
+        while True:
+            # 1. 接続確認（開いていなければ接続を試みる）
+            if self.ser is None or not self.ser.is_open:
+                self.port_open()
+
+            # 2. データの読み取り試行
+            try:
+                # readlineはtimeout設定により、データが来なくてもブロックしすぎない
                 data = self.ser.readline()
-                data = data.strip()
-                data = data.decode('utf-8')
-                gSerialReceive = data
-            
+                
+                if data:
+                    data = data.decode('utf-8', errors='ignore').strip()
+                    gSerialReceive = data
+                    # デバッグ用
+                    # if self.logger: self.logger.debug(f"Received: {data}")
+                
+            except (serial.SerialException, OSError) as e:
+                if self.logger:
+                    self.logger.error(f"Disconnected during read: {e}")
+                # 切断されたのでポートを閉じて、次のループで再接続へ
+                if self.ser:
+                    self.ser.close()
+                self.ser = None
+                time.sleep(0.5)
+
             time.sleep(0.001)
 
-    
     def port_close(self):
         try:
-            self.ser.close()
+            if self.ser:
+                self.ser.close()
         except:
             pass
-
 
 def main(args = None):
     rclpy.init(args=args)
