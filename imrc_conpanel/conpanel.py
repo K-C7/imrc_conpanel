@@ -9,12 +9,13 @@ from std_srvs.srv import Trigger
 from std_srvs.srv import Empty
 from nav2_msgs.srv import ClearEntireCostmap
 
-import time
+import time, math
 
 from imrc_conpanel.serial_resolver import *
 from imrc_messages.msg import ConpanelLedControl
 from imrc_messages.msg import ConpanelBuzzerControl
 from imrc_messages.msg import GeneralCommand
+from imrc_messages.srv import ResetMissBall
 
 gSerialReceive = ""
 ggetRes = ""
@@ -104,7 +105,7 @@ class ControlPanel(Node):
         else:
             self.mode_operation = "AUTO"
         
-        if(self.button_external_states[1] == 0):
+        if(self.button_external_states[1] == 1):
             self.mode_ready = "STAND BY"
         else:
             self.mode_ready = "GO"
@@ -203,11 +204,8 @@ class ControlPanel(Node):
             # str.data = "NG"
             # self.conpanel_miss_ball_pub.publish(str)
 
-            cli = self.create_client(Empty, "/conpanel_reset_miss_ball", 10)
-            while not cli.wait_for_service(timeout_sec=1.0):
-                self.get_logger().info('/conpanel_reset_miss_ball service not available, waiting again...')
-            req = Empty()
-            cli.call(req)
+            self.miss_reset_cli = self.create_client(ResetMissBall, "/reset_miss_ball")
+            self.miss_reset_callback()
 
         elif(buttonNumber == 4):
             self.initialize_imu()
@@ -271,8 +269,8 @@ class ControlPanel(Node):
         initial_pose.header.frame_id = "map"
         initial_pose.pose.pose.position.x = 0.0
         initial_pose.pose.pose.position.y = 0.0
-        initial_pose.pose.pose.orientation.z = 1.0
-        initial_pose.pose.pose.orientation.w = 0.0
+        initial_pose.pose.pose.orientation.z = math.sin(-1.5708 / 2.0)
+        initial_pose.pose.pose.orientation.w = math.cos(-1.5708 / 2.0)
 
         self.initial_pose_pub.publish(initial_pose)
 
@@ -295,6 +293,22 @@ class ControlPanel(Node):
                 gSerialReceive = ''
             
             time.sleep(0.001)
+
+    def miss_reset_callback(self):
+        while not self.miss_reset_cli.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('Waiting for miss reset service...')
+        req = ResetMissBall.Request()
+        req.color = "ALL"
+        future = self.miss_reset_cli.call_async(req)
+        future.add_done_callback(self.miss_reset_done)
+        
+    def miss_reset_done(self, future):
+        try:
+            result = future.result()
+            self.get_logger().info("ミスボールリセット成功")
+        except Exception as e:
+            self.get_logger().error(f"ミスボールリセット失敗: {e}")
+
 
 class UartUtils():
     def __init__(self, sn):
